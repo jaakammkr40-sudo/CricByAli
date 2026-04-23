@@ -23,64 +23,89 @@ class TournamentSetupScreen extends ConsumerStatefulWidget {
 class _TournamentSetupScreenState extends ConsumerState<TournamentSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController(text: 'Al Fatah Cup 2025');
-  final _teamCountCtrl = TextEditingController(text: '12');
   final _groupCountCtrl = TextEditingController(text: '4');
+  final _bulkCtrl = TextEditingController();
+  final _addOneCtrl = TextEditingController();
 
   bool _useAutoTeams = true;
-  List<TextEditingController> _teamControllers = [];
-  int _manualTeamCount = 8;
+  int _autoTeamCount = 12;
+
+  // List of (id, controller) for the editable team list
+  final List<(String, TextEditingController)> _teams = [];
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _teamCountCtrl.dispose();
     _groupCountCtrl.dispose();
-    for (final c in _teamControllers) {
+    _bulkCtrl.dispose();
+    _addOneCtrl.dispose();
+    for (final (_, c) in _teams) {
       c.dispose();
     }
     super.dispose();
   }
 
-  void _switchToManual() {
-    final count = int.tryParse(_teamCountCtrl.text) ?? 8;
-    final clampedCount = count.clamp(2, 200);
-    for (final c in _teamControllers) {
-      c.dispose();
-    }
-    _teamControllers = List.generate(
-      clampedCount,
-      (i) => TextEditingController(text: 'Team ${i + 1}'),
-    );
+  void _parseBulk() {
+    final lines = _bulkCtrl.text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+
+    if (lines.isEmpty) return;
+
     setState(() {
-      _useAutoTeams = false;
-      _manualTeamCount = clampedCount;
+      for (final line in lines) {
+        _teams.add((_uuid.v4(), TextEditingController(text: line)));
+      }
+      _bulkCtrl.clear();
     });
+  }
+
+  void _addOneTeam() {
+    final name = _addOneCtrl.text.trim();
+    if (name.isEmpty) return;
+    setState(() {
+      _teams.add((_uuid.v4(), TextEditingController(text: name)));
+      _addOneCtrl.clear();
+    });
+  }
+
+  void _removeTeam(int index) {
+    final (_, ctrl) = _teams[index];
+    ctrl.dispose();
+    setState(() => _teams.removeAt(index));
   }
 
   List<Team> _buildTeams() {
     if (_useAutoTeams) {
-      final count = int.tryParse(_teamCountCtrl.text) ?? 8;
-      return TournamentEngine.generateDummyTeams(count.clamp(2, 200));
+      return TournamentEngine.generateDummyTeams(_autoTeamCount.clamp(2, 200));
     }
-    final names = <String>{};
-    final teams = <Team>[];
-    for (final ctrl in _teamControllers) {
-      final raw = ctrl.text.trim();
-      final name = names.contains(raw) ? '$raw (${names.length})' : raw;
-      names.add(name);
-      teams.add(Team(id: _uuid.v4(), name: name));
+    final seen = <String>{};
+    final result = <Team>[];
+    for (final (id, ctrl) in _teams) {
+      var name = ctrl.text.trim();
+      if (name.isEmpty) name = 'Team';
+      if (seen.contains(name)) name = '$name (${result.length + 1})';
+      seen.add(name);
+      result.add(Team(id: id, name: name));
     }
-    return teams;
+    return result;
   }
 
   void _createTournament() {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!_useAutoTeams && _teams.length < 2) {
+      _showError('Add at least 2 teams.');
+      return;
+    }
+
     final teams = _buildTeams();
-    final numGroups = int.tryParse(_groupCountCtrl.text) ?? 4;
+    final numGroups = int.tryParse(_groupCountCtrl.text) ?? 1;
 
     if (numGroups > teams.length) {
-      _showError('Number of groups cannot exceed number of teams.');
+      _showError('Groups cannot exceed number of teams (${teams.length}).');
       return;
     }
 
@@ -128,89 +153,108 @@ class _TournamentSetupScreenState extends ConsumerState<TournamentSetupScreen> {
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Enter tournament name' : null,
               ),
-              const SizedBox(height: 24),
-              _sectionLabel('Teams'),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _textField(
-                      controller: _teamCountCtrl,
-                      label: 'Number of Teams',
-                      hint: '12',
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        final n = int.tryParse(v ?? '');
-                        if (n == null || n < 2) return 'Min 2';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _textField(
-                      controller: _groupCountCtrl,
-                      label: 'Number of Groups',
-                      hint: '4',
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        final n = int.tryParse(v ?? '');
-                        if (n == null || n < 1) return 'Min 1';
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 20),
+              _textField(
+                controller: _groupCountCtrl,
+                label: 'Number of Groups',
+                hint: '4',
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (v) {
+                  final n = int.tryParse(v ?? '');
+                  if (n == null || n < 1) return 'Min 1';
+                  return null;
+                },
               ),
-              const SizedBox(height: 16),
-              _teamModeToggle(),
-              const SizedBox(height: 12),
-              if (!_useAutoTeams) ...[
-                _sectionLabel('Team Names'),
+              const SizedBox(height: 28),
+              _sectionLabel('Team Entry Mode'),
+              const SizedBox(height: 10),
+              _modeToggle(),
+              const SizedBox(height: 20),
+
+              if (_useAutoTeams) ...[
+                _sectionLabel('Number of Teams'),
                 const SizedBox(height: 10),
-                ..._teamControllers.asMap().entries.map(
-                  (e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _textField(
-                      controller: e.value,
-                      label: 'Team ${e.key + 1}',
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
+                _autoTeamCountRow(),
+              ],
+
+              if (!_useAutoTeams) ...[
+                // ── Bulk paste area ──────────────────────────────
+                _sectionLabel('Paste Teams (one per line)'),
+                const SizedBox(height: 8),
+                _bulkPasteField(),
+                const SizedBox(height: 8),
+                AppButton(
+                  label: 'Add These Teams',
+                  icon: Icons.playlist_add,
+                  onPressed: _parseBulk,
                 ),
+                const SizedBox(height: 24),
+
+                // ── Parsed / editable list ───────────────────────
+                if (_teams.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      _sectionLabel('Teams  (${_teams.length})'),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          for (final (_, c) in _teams) c.dispose();
+                          setState(() => _teams.clear());
+                        },
+                        child: const Text(
+                          'Clear all',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ..._teams.asMap().entries.map(
+                        (e) => _teamRow(e.key, e.value.$2),
+                      ),
+                  const SizedBox(height: 12),
+                ],
+
+                // ── Add single team ──────────────────────────────
+                _sectionLabel('Add One Team'),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _iconBtn(Icons.remove, () {
-                      if (_teamControllers.length <= 2) return;
-                      _teamControllers.last.dispose();
-                      setState(() {
-                        _teamControllers.removeLast();
-                        _manualTeamCount--;
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _iconBtn(Icons.add, () {
-                      setState(() {
-                        _manualTeamCount++;
-                        _teamControllers.add(
-                          TextEditingController(
-                              text: 'Team $_manualTeamCount'),
-                        );
-                      });
-                    }),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _addOneCtrl,
+                        style:
+                            const TextStyle(color: AppColors.textPrimary),
+                        decoration: const InputDecoration(
+                          labelText: 'Team name',
+                          hintText: 'e.g. 432 Ahmad',
+                        ),
+                        onFieldSubmitted: (_) => _addOneTeam(),
+                      ),
+                    ),
                     const SizedBox(width: 10),
-                    Text(
-                      '${_teamControllers.length} teams',
-                      style: const TextStyle(color: AppColors.textSecondary),
+                    GestureDetector(
+                      onTap: _addOneTeam,
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.goldGradient,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.add,
+                            color: Colors.black87, size: 22),
+                      ),
                     ),
                   ],
                 ),
               ],
-              const SizedBox(height: 32),
+
+              const SizedBox(height: 36),
               AppButton(
                 label: 'Create Tournament',
                 icon: Icons.sports_cricket,
@@ -221,6 +265,207 @@ class _TournamentSetupScreenState extends ConsumerState<TournamentSetupScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _bulkPasteField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: TextField(
+        controller: _bulkCtrl,
+        maxLines: 7,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontFamily: 'monospace',
+          fontSize: 14,
+        ),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          hintText: '101 EB\n302\n432 Ahmad\nReal Madrid\n...',
+          hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+        ),
+      ),
+    );
+  }
+
+  Widget _teamRow(int index, TextEditingController ctrl) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            alignment: Alignment.center,
+            child: Text(
+              '${index + 1}',
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Container(width: 1, height: 36, color: AppColors.cardBorder),
+          Expanded(
+            child: TextField(
+              controller: ctrl,
+              style: const TextStyle(
+                  color: AppColors.textPrimary, fontSize: 14),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16, color: AppColors.textMuted),
+            onPressed: () => _removeTeam(index),
+            splashRadius: 18,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _autoTeamCountRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () {
+              if (_autoTeamCount > 2) setState(() => _autoTeamCount--);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.bgMid,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.remove,
+                  color: AppColors.textSecondary, size: 20),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              '$_autoTeamCount teams',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              if (_autoTeamCount < 200) setState(() => _autoTeamCount++);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.bgMid,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.add,
+                  color: AppColors.textSecondary, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeToggle() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => _useAutoTeams = true),
+            child: _modeCard(
+              icon: Icons.auto_awesome,
+              label: 'Auto-Generate',
+              subtitle: 'Use preset names',
+              selected: _useAutoTeams,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => _useAutoTeams = false),
+            child: _modeCard(
+              icon: Icons.format_list_bulleted,
+              label: 'Enter Teams',
+              subtitle: 'Paste or type names',
+              selected: !_useAutoTeams,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _modeCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required bool selected,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: selected ? AppColors.primaryGradient : null,
+        color: selected ? null : AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: selected ? AppColors.primary : AppColors.cardBorder,
+          width: selected ? 2 : 1,
+        ),
+        boxShadow: selected
+            ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10)]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon,
+              color: selected ? Colors.white : AppColors.textMuted, size: 22),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: selected ? Colors.white70 : AppColors.textMuted,
+              fontSize: 10,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -252,105 +497,6 @@ class _TournamentSetupScreenState extends ConsumerState<TournamentSetupScreen> {
       style: const TextStyle(color: AppColors.textPrimary),
       decoration: InputDecoration(labelText: label, hintText: hint),
       validator: validator,
-    );
-  }
-
-  Widget _teamModeToggle() {
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => _useAutoTeams = true),
-            child: _modeCard(
-              icon: Icons.auto_awesome,
-              label: 'Auto-Generate',
-              subtitle: 'Use preset team names',
-              selected: _useAutoTeams,
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: GestureDetector(
-            onTap: _switchToManual,
-            child: _modeCard(
-              icon: Icons.edit_note,
-              label: 'Enter Manually',
-              subtitle: 'Type your team names',
-              selected: !_useAutoTeams,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _modeCard({
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required bool selected,
-  }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: selected ? AppColors.primaryGradient : null,
-        color: selected ? null : AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: selected ? AppColors.primary : AppColors.cardBorder,
-          width: selected ? 2 : 1,
-        ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
-                  blurRadius: 10,
-                )
-              ]
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon,
-              color: selected ? Colors.white : AppColors.textMuted, size: 22),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : AppColors.textSecondary,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: selected
-                  ? Colors.white70
-                  : AppColors.textMuted,
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _iconBtn(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.cardBorder),
-        ),
-        child: Icon(icon, color: AppColors.textSecondary, size: 18),
-      ),
     );
   }
 }
