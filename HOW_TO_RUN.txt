@@ -1,0 +1,122 @@
+===========================================================
+  CricByAli — Cricket Tournament Manager
+  Sponsored by Al Fatah Cricket Club 429EB &
+               Burewala Union Cricket
+===========================================================
+
+PREREQUISITES
+─────────────
+  • Flutter SDK (3.x stable)  →  https://flutter.dev/docs/get-started/install
+  • Dart SDK (included with Flutter)
+  • Android Studio / VS Code with Flutter extension
+  • Android device / emulator  OR  iOS simulator (Mac only)
+
+RUN IN 3 STEPS
+──────────────
+  1.  Open a terminal in this folder (ClaudeTestNewDev/)
+
+  2.  Install packages:
+        flutter pub get
+
+  3.  Launch the app:
+        flutter run
+
+      For a specific device:
+        flutter devices           ← list connected devices
+        flutter run -d <deviceId>
+
+BUILD APK (Android)
+───────────────────
+  flutter build apk --release
+  APK location:  build/app/outputs/flutter-apk/app-release.apk
+
+BUILD IPA (iOS, Mac only)
+──────────────────────────
+  flutter build ios --release
+
+===========================================================
+  PROJECT STRUCTURE
+===========================================================
+
+  lib/
+  ├── main.dart                     App entry point
+  ├── app.dart                      Root widget + theme setup
+  ├── core/
+  │   ├── constants/
+  │   │   ├── app_colors.dart       Color palette (teal/gold/dark)
+  │   │   └── app_theme.dart        Material 3 dark theme
+  │   └── utils/
+  │       └── tournament_engine.dart  Core algorithm (distribution, matches, byes)
+  ├── models/
+  │   ├── team.dart                 Team data class
+  │   ├── match_model.dart          Match (teamA, teamB, winner, round)
+  │   ├── group_model.dart          Group (teams, rounds, winner)
+  │   └── tournament_model.dart     Tournament (groups, knockout rounds, champion)
+  ├── providers/
+  │   └── tournament_provider.dart  Riverpod StateNotifier (all state transitions)
+  ├── screens/
+  │   ├── splash_screen.dart        Animated splash with branding
+  │   ├── home_screen.dart          Dashboard + active tournament resume
+  │   ├── setup/
+  │   │   └── tournament_setup_screen.dart  Create tournament form
+  │   ├── groups/
+  │   │   ├── group_overview_screen.dart    All groups + status
+  │   │   └── group_matches_screen.dart     Per-group matches + round control
+  │   ├── knockout/
+  │   │   └── knockout_screen.dart          Knockout bracket matches
+  │   └── winner/
+  │       └── winner_screen.dart            Champion + confetti
+  └── widgets/
+      ├── match_card.dart           Match card UI (normal + bye variants)
+      ├── round_header.dart         Round label pill
+      ├── gradient_background.dart  Dark stadium gradient wrapper
+      └── app_button.dart           Primary/Gold/Outlined button variants
+
+===========================================================
+  TOURNAMENT FLOW
+===========================================================
+
+  1. SPLASH  →  3-second animated splash screen
+
+  2. HOME  →  Create Tournament button
+
+  3. SETUP
+     • Enter tournament name
+     • Set number of teams (2–200)
+     • Set number of groups
+     • Choose: Auto-generate team names  OR  Type manually
+
+  4. GROUP STAGE
+     • Teams shuffled and distributed round-robin into groups
+     • Each group runs its own knockout tournament
+     • Bye assigned randomly when a group has odd teams
+     • Tap a team to mark them as match winner
+     • Tap "Next Round" when all matches in a round are done
+     • Group winner is the last team standing
+
+  5. KNOCKOUT STAGE  (unlocked when ALL groups finish)
+     • All group winners enter the knockout bracket
+     • Rounds auto-named: Round of N → Quarter Final → Semi Final → Final
+     • Same match interaction as group stage
+     • Bye assigned if odd number of winners
+
+  6. WINNER SCREEN
+     • Champion name displayed with gold trophy
+     • Confetti animation
+     • Tournament stats shown
+     • "New Tournament" button resets everything
+
+===========================================================
+  FUTURE IMPROVEMENT IDEAS
+===========================================================
+
+  • Persist tournaments to local storage (Hive / SQLite)
+  • Share bracket as image (screenshot + share_plus)
+  • Multiple tournament history / leaderboard
+  • Custom team logos / colours
+  • PDF bracket export
+  • Offline-first with sync when online
+  • Match scheduling with time slots
+  • Venue / field assignment per match
+
+===========================================================
