@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/constants/app_colors.dart';
-import 'home_screen.dart';
+import 'main_shell.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -33,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const HomeScreen(),
+            pageBuilder: (_, __, ___) => const MainShell(),
             transitionsBuilder: (_, anim, __, child) =>
                 FadeTransition(opacity: anim, child: child),
             transitionDuration: const Duration(milliseconds: 600),
@@ -89,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen>
                     shaderCallback: (bounds) =>
                         AppColors.goldGradient.createShader(bounds),
                     child: const Text(
-                      'CricByAli',
+                      'Cric By Ali',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 42,

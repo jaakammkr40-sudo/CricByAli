@@ -26,6 +26,7 @@ jobs:
           cp pubspec.yaml pubspec_backup.yaml
           flutter create . --project-name cric_by_ali --org com.alfatah429eb
           cp pubspec_backup.yaml pubspec.yaml
+          sed -i 's/android:label="[^"]*"/android:label="Cric By Ali"/' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: flutter pub get

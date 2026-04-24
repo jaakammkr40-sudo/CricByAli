@@ -17,6 +17,16 @@ class TournamentEngine {
   ) {
     final shuffled = List<Team>.from(teams)..shuffle(_rng);
     final clampedGroups = numGroups.clamp(1, teams.length);
+
+    // Randomly decide which groups get the extra team (when teams don't divide evenly)
+    final base = shuffled.length ~/ clampedGroups;
+    final extra = shuffled.length % clampedGroups;
+    final groupIndices = List.generate(clampedGroups, (i) => i)..shuffle(_rng);
+    final groupSizes = List.filled(clampedGroups, base);
+    for (int i = 0; i < extra; i++) {
+      groupSizes[groupIndices[i]]++;
+    }
+
     final groups = List.generate(clampedGroups, (i) {
       return GroupModel(
         id: _uuid.v4(),
@@ -25,10 +35,11 @@ class TournamentEngine {
       );
     });
 
-    for (int i = 0; i < shuffled.length; i++) {
-      final groupTeams = List<Team>.from(groups[i % clampedGroups].teams)
-        ..add(shuffled[i]);
-      groups[i % clampedGroups] = groups[i % clampedGroups].copyWith(teams: groupTeams);
+    int teamIdx = 0;
+    for (int g = 0; g < clampedGroups; g++) {
+      final groupTeams = shuffled.sublist(teamIdx, teamIdx + groupSizes[g]);
+      teamIdx += groupSizes[g];
+      groups[g] = groups[g].copyWith(teams: groupTeams);
     }
 
     // Generate first round for each group
