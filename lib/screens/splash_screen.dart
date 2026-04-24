@@ -89,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen>
                     shaderCallback: (bounds) =>
                         AppColors.goldGradient.createShader(bounds),
                     child: const Text(
-                      'Cric By Ali',
+                      'CricByAli',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 42,

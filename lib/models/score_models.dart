@@ -1,6 +1,4 @@
-import 'dart:convert';
-
-enum BallType { normal, wide, noBall, wicket }
+enum BallType { normal, wide, noBall, wicket, bye }
 
 class BatsmanStats {
   final String name;
@@ -79,7 +77,11 @@ class InningsData {
     required this.bowlers,
   });
 
-  String get overStr => '${legalBalls ~/ 6}.${legalBalls % 6}';
+  String get overStr {
+    final o = legalBalls ~/ 6;
+    final b = legalBalls % 6;
+    return b == 0 ? '$o.0' : '$o.$b';
+  }
 
   BatsmanStats? get topBatsman => batsmen.isEmpty
       ? null
@@ -108,10 +110,12 @@ class InningsData {
         wickets: j['wickets'],
         legalBalls: j['legalBalls'],
         totalOvers: j['totalOvers'],
-        batsmen:
-            (j['batsmen'] as List).map((b) => BatsmanStats.fromJson(b)).toList(),
-        bowlers:
-            (j['bowlers'] as List).map((b) => BowlerStats.fromJson(b)).toList(),
+        batsmen: (j['batsmen'] as List)
+            .map((b) => BatsmanStats.fromJson(b))
+            .toList(),
+        bowlers: (j['bowlers'] as List)
+            .map((b) => BowlerStats.fromJson(b))
+            .toList(),
       );
 }
 

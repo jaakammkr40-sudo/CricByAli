@@ -5,6 +5,7 @@ import '../../models/score_models.dart';
 import '../../providers/score_provider.dart';
 import '../../widgets/gradient_background.dart';
 import 'match_setup_screen.dart';
+import 'scoring_screen.dart';
 
 class ScoreHomeScreen extends ConsumerWidget {
   const ScoreHomeScreen({super.key});
@@ -19,20 +20,35 @@ class ScoreHomeScreen extends ConsumerWidget {
         automaticallyImplyLeading: false,
       ),
       body: GradientBackground(
-        child: state.matches.isEmpty
-            ? _EmptyState(onNew: () => _newMatch(context))
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                children: [
-                  for (final match in state.matches)
-                    _MatchHistoryCard(
-                      match: match,
-                      onDelete: () => _confirmDelete(context, ref, match.id),
-                      onEditWinner: () =>
-                          _editWinner(context, ref, match),
-                    ),
-                ],
+        child: Column(
+          children: [
+            // Resume banner
+            if (state.live != null)
+              _ResumeBanner(
+                live: state.live!,
+                onResume: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ScoringScreen()),
+                ),
+                onDiscard: () => _confirmDiscard(context, ref),
               ),
+            Expanded(
+              child: state.matches.isEmpty && state.live == null
+                  ? _EmptyState(onNew: () => _newMatch(context))
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                      children: [
+                        for (final match in state.matches)
+                          _MatchHistoryCard(
+                            match: match,
+                            onDelete: () => _confirmDelete(context, ref, match.id),
+                            onEditWinner: () => _editWinner(context, ref, match),
+                          ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _newMatch(context),
@@ -49,6 +65,31 @@ class ScoreHomeScreen extends ConsumerWidget {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const MatchSetupScreen()),
+    );
+  }
+
+  void _confirmDiscard(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.bgMid,
+        title: const Text('Discard Match?',
+            style: TextStyle(color: AppColors.textPrimary)),
+        content: const Text('All scoring data will be lost.',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              ref.read(scoreProvider.notifier).discardMatch();
+              Navigator.pop(context);
+            },
+            child: const Text('Discard', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -112,6 +153,81 @@ class ScoreHomeScreen extends ConsumerWidget {
               },
               child: const Text('Save',
                   style: TextStyle(color: AppColors.secondary)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResumeBanner extends StatelessWidget {
+  final LiveMatchState live;
+  final VoidCallback onResume;
+  final VoidCallback onDiscard;
+
+  const _ResumeBanner({
+    required this.live,
+    required this.onResume,
+    required this.onDiscard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onResume,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 12),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.sports_cricket, color: Colors.white, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Match In Progress',
+                      style: TextStyle(
+                          color: Colors.white70, fontSize: 10, letterSpacing: 1.5)),
+                  Text(
+                    '${live.teamA}  vs  ${live.teamB}',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                  ),
+                  Text(
+                    '${live.runs}/${live.wickets}  (${live.oversStr})  Inn ${live.currentInnings}/2',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('Resume',
+                      style: TextStyle(
+                          color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 12)),
+                ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: onDiscard,
+                  child: const Text('Discard',
+                      style: TextStyle(color: Colors.white54, fontSize: 10)),
+                ),
+              ],
             ),
           ],
         ),

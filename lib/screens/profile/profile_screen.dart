@@ -37,14 +37,20 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Center(
-                  child: Text(
-                    'AR',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/profile.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Text(
+                        'AR',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
                     ),
                   ),
                 ),

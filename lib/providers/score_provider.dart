@@ -13,7 +13,8 @@ class LiveMatchState {
   final String striker, nonStriker, currentBowler;
   final Map<String, BatsmanStats> batsmanStats;
   final Map<String, BowlerStats> bowlerStats;
-  final List<String> overDisplay;
+  final List<String> overDisplay;       // current over balls
+  final List<List<String>> pastOvers;   // completed overs history
   final InningsData? firstInnings;
 
   final bool needsNewBatsman;
@@ -36,6 +37,7 @@ class LiveMatchState {
     required this.batsmanStats,
     required this.bowlerStats,
     this.overDisplay = const [],
+    this.pastOvers = const [],
     this.firstInnings,
     this.needsNewBatsman = false,
     this.needsNewBowler = false,
@@ -45,7 +47,12 @@ class LiveMatchState {
 
   int get currentOverNumber => legalBalls ~/ 6;
   int get ballsInOver => legalBalls % 6;
-  String get oversStr => '$currentOverNumber.$ballsInOver';
+  String get oversStr {
+    final o = legalBalls ~/ 6;
+    final b = legalBalls % 6;
+    return '$o.$b';
+  }
+
   int get target => (firstInnings?.totalRuns ?? 0) + 1;
   String get battingTeam => currentInnings == 1 ? teamA : teamB;
   String get bowlingTeam => currentInnings == 1 ? teamB : teamA;
@@ -61,6 +68,7 @@ class LiveMatchState {
     Map<String, BatsmanStats>? batsmanStats,
     Map<String, BowlerStats>? bowlerStats,
     List<String>? overDisplay,
+    List<List<String>>? pastOvers,
     InningsData? firstInnings,
     bool? needsNewBatsman,
     bool? needsNewBowler,
@@ -82,6 +90,7 @@ class LiveMatchState {
         batsmanStats: batsmanStats ?? this.batsmanStats,
         bowlerStats: bowlerStats ?? this.bowlerStats,
         overDisplay: overDisplay ?? this.overDisplay,
+        pastOvers: pastOvers ?? this.pastOvers,
         firstInnings: firstInnings ?? this.firstInnings,
         needsNewBatsman: needsNewBatsman ?? this.needsNewBatsman,
         needsNewBowler: needsNewBowler ?? this.needsNewBowler,
@@ -112,6 +121,9 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
     _load();
   }
 
+  // Full state snapshots for undo — one per ball
+  final List<LiveMatchState> _history = [];
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('score_matches') ?? '[]';
@@ -137,6 +149,7 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
     required String nonStriker,
     required String bowler,
   }) {
+    _history.clear();
     state = state.copyWith(
       live: LiveMatchState(
         id: _uuid.v4(),
@@ -156,64 +169,77 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
   }
 
   void recordBall({required BallType type, required int runs}) {
+    // Save snapshot for undo
+    _history.add(state.live!);
+
     var live = state.live!;
-    final isExtra = type == BallType.wide || type == BallType.noBall;
-    final isLegal = !isExtra;
-    final totalRuns = runs + (isExtra ? 1 : 0);
+
+    // Bye: legal ball, runs are extras (not to batsman), bowler concedes
+    // Wide: illegal, extra run, batsman doesn't face
+    // NoBall: illegal, extra run, batsman faces, can score
+    final isWide = type == BallType.wide;
+    final isNoBall = type == BallType.noBall;
+    final isBye = type == BallType.bye;
+    final isWicket = type == BallType.wicket;
+    final isExtra = isWide || isNoBall || isBye;
+    final isLegal = !isWide && !isNoBall; // bye and wicket count as legal
+
+    final extraPenalty = (isWide || isNoBall) ? 1 : 0;
+    final totalRuns = runs + extraPenalty;
 
     int newRuns = live.runs + totalRuns;
     int newLegalBalls = live.legalBalls + (isLegal ? 1 : 0);
-    int newWickets = live.wickets + (type == BallType.wicket ? 1 : 0);
+    int newWickets = live.wickets + (isWicket ? 1 : 0);
 
-    // Update batsman stats (wides don't count against batsman)
+    // Batsman stats: face the ball on everything except wide
     var bStats = Map<String, BatsmanStats>.from(live.batsmanStats);
-    if (type != BallType.wide && live.striker.isNotEmpty) {
+    if (!isWide && !isBye && live.striker.isNotEmpty) {
       final cur = bStats[live.striker] ?? BatsmanStats(name: live.striker);
-      bStats[live.striker] = type == BallType.wicket
+      bStats[live.striker] = isWicket
           ? cur.copyWith(balls: cur.balls + 1, isOut: true)
           : cur.copyWith(runs: cur.runs + runs, balls: cur.balls + 1);
+    } else if (isBye && live.striker.isNotEmpty) {
+      // Batsman faces but runs not credited to them
+      final cur = bStats[live.striker] ?? BatsmanStats(name: live.striker);
+      bStats[live.striker] = cur.copyWith(balls: cur.balls + 1);
     }
 
-    // Update bowler stats
+    // Bowler stats
     var wStats = Map<String, BowlerStats>.from(live.bowlerStats);
     final bow = wStats[live.currentBowler] ?? BowlerStats(name: live.currentBowler);
     wStats[live.currentBowler] = bow.copyWith(
       runs: bow.runs + totalRuns,
       balls: bow.balls + (isLegal ? 1 : 0),
-      wickets: bow.wickets + (type == BallType.wicket ? 1 : 0),
+      wickets: bow.wickets + (isWicket ? 1 : 0),
     );
 
-    // Strike rotation on odd runs (not on wicket, not on wide)
+    // Strike rotation on odd runs (not on wide)
     String striker = live.striker;
     String nonStriker = live.nonStriker;
-    if (type != BallType.wicket && type != BallType.wide && runs.isOdd) {
+    if (!isWide && !isWicket && runs.isOdd) {
       final tmp = striker;
       striker = nonStriker;
       nonStriker = tmp;
     }
 
-    // Over display
-    final ballDisplay = switch (type) {
-      BallType.wide => 'Wd',
-      BallType.noBall => runs > 0 ? 'NB+$runs' : 'NB',
-      BallType.wicket => 'W',
-      _ => runs == 0 ? '.' : '$runs',
-    };
-    var overDisplay = List<String>.from(live.overDisplay)..add(ballDisplay);
+    // Build over display string
+    final ballStr = _ballDisplay(type, runs);
+    var overDisplay = List<String>.from(live.overDisplay)..add(ballStr);
+    var pastOvers = List<List<String>>.from(live.pastOvers);
 
-    // Check over complete (after legal ball)
-    bool overComplete = isLegal && (newLegalBalls % 6 == 0) && newLegalBalls > 0;
+    // Check over complete (6 legal balls)
+    final overComplete = isLegal && (newLegalBalls % 6 == 0) && newLegalBalls > 0;
     if (overComplete) {
+      pastOvers = [...pastOvers, List.from(overDisplay)];
+      overDisplay = [];
       // Swap strike at end of over
       final tmp = striker;
       striker = nonStriker;
       nonStriker = tmp;
-      overDisplay = [];
     }
 
-    // Check innings complete
-    bool inningsOver =
-        newWickets >= 10 || newLegalBalls >= live.totalOvers * 6;
+    // Check innings over
+    bool inningsOver = newWickets >= 10 || newLegalBalls >= live.totalOvers * 6;
 
     // Second innings chase win
     bool matchComplete = false;
@@ -222,10 +248,7 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
       matchComplete = true;
     }
 
-    // If wicket and innings not over: striker leaves (will be replaced)
-    if (type == BallType.wicket && !inningsOver) {
-      striker = '';
-    }
+    if (isWicket && !inningsOver) striker = '';
 
     live = live.copyWith(
       runs: newRuns,
@@ -236,13 +259,38 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
       batsmanStats: bStats,
       bowlerStats: wStats,
       overDisplay: overDisplay,
-      needsNewBatsman: type == BallType.wicket && !inningsOver,
+      pastOvers: pastOvers,
+      needsNewBatsman: isWicket && !inningsOver,
       needsNewBowler: overComplete && !inningsOver,
       inningsComplete: inningsOver,
       matchComplete: live.currentInnings == 2 && inningsOver,
     );
     state = state.copyWith(live: live);
   }
+
+  String _ballDisplay(BallType type, int runs) {
+    switch (type) {
+      case BallType.wide:
+        return runs > 0 ? 'Wd+$runs' : 'Wd';
+      case BallType.noBall:
+        return runs > 0 ? 'NB+$runs' : 'NB';
+      case BallType.bye:
+        return runs > 0 ? 'B$runs' : 'B';
+      case BallType.wicket:
+        return 'W';
+      default:
+        return runs == 0 ? '.' : '$runs';
+    }
+  }
+
+  /// Undo the last recorded ball by restoring the previous snapshot.
+  void undoLastBall() {
+    if (_history.isEmpty) return;
+    final prev = _history.removeLast();
+    state = state.copyWith(live: prev);
+  }
+
+  bool get canUndo => _history.isNotEmpty;
 
   void newBatsman(String name) {
     var live = state.live!;
@@ -279,6 +327,7 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
   }) {
     final live = state.live!;
     final firstInnings = _buildInnings(live, live.teamA);
+    _history.clear();
     state = state.copyWith(
       live: live.copyWith(
         currentInnings: 2,
@@ -294,6 +343,7 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
         },
         bowlerStats: {bowler: BowlerStats(name: bowler)},
         overDisplay: [],
+        pastOvers: [],
         firstInnings: firstInnings,
         needsNewBatsman: false,
         needsNewBowler: false,
@@ -322,7 +372,7 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
     if (second.totalRuns >= first.totalRuns + 1) {
       winner = live.teamB;
     } else if (second.totalRuns == first.totalRuns) {
-      winner = null; // tie
+      winner = null;
     } else {
       winner = live.teamA;
     }
@@ -338,12 +388,15 @@ class ScoreNotifier extends StateNotifier<ScoreState> {
       createdAt: DateTime.now(),
     );
 
-    final updated = [match, ...state.matches];
-    state = state.copyWith(clearLive: true, matches: updated);
+    _history.clear();
+    state = state.copyWith(clearLive: true, matches: [match, ...state.matches]);
     _save();
   }
 
-  void discardMatch() => state = state.copyWith(clearLive: true);
+  void discardMatch() {
+    _history.clear();
+    state = state.copyWith(clearLive: true);
+  }
 
   void deleteMatch(String id) {
     final updated = state.matches.where((m) => m.id != id).toList();
