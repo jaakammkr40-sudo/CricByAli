@@ -123,7 +123,7 @@ class _MatchSetupScreenState extends ConsumerState<MatchSetupScreen> {
       );
 
   Widget _oversSelector() {
-    const quickValues = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+    const quickValues = [1, 2, 3, 4, 5, 6];
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(

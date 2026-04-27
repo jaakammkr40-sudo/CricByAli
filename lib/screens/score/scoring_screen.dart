@@ -826,7 +826,7 @@ class _InningsBreakDialogState extends State<_InningsBreakDialog> {
                 Text('(${live.oversStr} ov)',
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                 const SizedBox(height: 4),
-                Text('${live.teamB} needs ${live.target} to win',
+                Text('${live.teamB} needs ${live.runs + 1} to win',
                     style: const TextStyle(
                         color: AppColors.secondary, fontWeight: FontWeight.w600, fontSize: 13)),
               ]),
