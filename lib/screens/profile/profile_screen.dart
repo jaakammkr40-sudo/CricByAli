@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/gradient_background.dart';
 
@@ -14,19 +13,6 @@ class ProfileScreen extends StatelessWidget {
           content: Text('Copied to clipboard'),
           duration: Duration(seconds: 1)),
     );
-  }
-
-  Future<void> _open(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open link')),
-        );
-      }
-    }
   }
 
   @override
@@ -110,29 +96,6 @@ class ProfileScreen extends StatelessWidget {
               label: 'Email',
               value: 'itxali333@gmail.com',
               onTap: () => _copy(context, 'itxali333@gmail.com'),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Social ───────────────────────────────────────────────
-            _sectionLabel('Social'),
-            const SizedBox(height: 10),
-            _socialTile(
-              context,
-              color: const Color(0xFF0077B5),
-              icon: Icons.work,
-              label: 'LinkedIn',
-              handle: 'ali-raza-468485274',
-              url: 'https://pk.linkedin.com/in/ali-raza-468485274',
-            ),
-            const SizedBox(height: 8),
-            _socialTile(
-              context,
-              color: const Color(0xFFE1306C),
-              icon: Icons.camera_alt,
-              label: 'Instagram',
-              handle: '@itx_a1i',
-              url: 'https://www.instagram.com/itx_a1i/',
             ),
 
             const SizedBox(height: 32),
@@ -247,56 +210,6 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const Icon(Icons.copy, color: AppColors.textMuted, size: 16),
-            ],
-          ),
-        ),
-      );
-
-  Widget _socialTile(
-    BuildContext context, {
-    required Color color,
-    required IconData icon,
-    required String label,
-    required String handle,
-    required String url,
-  }) =>
-      GestureDetector(
-        onTap: () => _open(context, url),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withOpacity(0.4)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 11)),
-                    Text(handle,
-                        style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-              Icon(Icons.open_in_new, color: color, size: 16),
             ],
           ),
         ),
