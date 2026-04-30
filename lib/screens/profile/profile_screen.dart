@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/gradient_background.dart';
 
@@ -9,8 +10,23 @@ class ProfileScreen extends StatelessWidget {
   void _copy(BuildContext context, String text) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 1)),
+      const SnackBar(
+          content: Text('Copied to clipboard'),
+          duration: Duration(seconds: 1)),
     );
+  }
+
+  Future<void> _open(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open link')),
+        );
+      }
+    }
   }
 
   @override
@@ -58,31 +74,26 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Name
             const Center(
               child: Text(
                 'Ali Raza Randhawa',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                ),
+                    color: AppColors.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800),
               ),
             ),
             const SizedBox(height: 6),
             const Center(
               child: Text(
-                'Developer & Creator of Cric By Ali',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                ),
+                'Developer & Creator of CricByAli',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
             ),
 
             const SizedBox(height: 32),
 
-            // Contact info
+            // ── Contact ──────────────────────────────────────────────
             _sectionLabel('Contact'),
             const SizedBox(height: 10),
             _contactTile(
@@ -90,6 +101,7 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.phone,
               label: 'Phone',
               value: '+923111200138',
+              onTap: () => _copy(context, '+923111200138'),
             ),
             const SizedBox(height: 8),
             _contactTile(
@@ -97,11 +109,35 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.email,
               label: 'Email',
               value: 'itxali333@gmail.com',
+              onTap: () => _copy(context, 'itxali333@gmail.com'),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Social ───────────────────────────────────────────────
+            _sectionLabel('Social'),
+            const SizedBox(height: 10),
+            _socialTile(
+              context,
+              color: const Color(0xFF0077B5),
+              icon: Icons.work,
+              label: 'LinkedIn',
+              handle: 'ali-raza-468485274',
+              url: 'https://pk.linkedin.com/in/ali-raza-468485274',
+            ),
+            const SizedBox(height: 8),
+            _socialTile(
+              context,
+              color: const Color(0xFFE1306C),
+              icon: Icons.camera_alt,
+              label: 'Instagram',
+              handle: '@itx_a1i',
+              url: 'https://www.instagram.com/itx_a1i/',
             ),
 
             const SizedBox(height: 32),
 
-            // Sponsors
+            // ── Sponsors ─────────────────────────────────────────────
             _sectionLabel('Sponsored By'),
             const SizedBox(height: 10),
             _sponsorCard(
@@ -118,7 +154,7 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 32),
 
-            // App info
+            // ── App Info ─────────────────────────────────────────────
             _sectionLabel('App Info'),
             const SizedBox(height: 10),
             Container(
@@ -130,7 +166,7 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: const Column(
                 children: [
-                  _InfoRow(label: 'App Name', value: 'Cric By Ali'),
+                  _InfoRow(label: 'App Name', value: 'CricByAli'),
                   Divider(color: AppColors.cardBorder, height: 20),
                   _InfoRow(label: 'Version', value: '1.0.0'),
                   Divider(color: AppColors.cardBorder, height: 20),
@@ -145,10 +181,9 @@ class ProfileScreen extends StatelessWidget {
                 'Made with ❤️ for local cricket\nAl Fatah Cricket Club 429EB',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.secondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                    color: AppColors.secondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 24),
@@ -173,9 +208,10 @@ class ProfileScreen extends StatelessWidget {
     required IconData icon,
     required String label,
     required String value,
+    required VoidCallback onTap,
   }) =>
       GestureDetector(
-        onTap: () => _copy(context, value),
+        onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
@@ -216,6 +252,56 @@ class ProfileScreen extends StatelessWidget {
         ),
       );
 
+  Widget _socialTile(
+    BuildContext context, {
+    required Color color,
+    required IconData icon,
+    required String label,
+    required String handle,
+    required String url,
+  }) =>
+      GestureDetector(
+        onTap: () => _open(context, url),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withOpacity(0.4)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            color: AppColors.textMuted, fontSize: 11)),
+                    Text(handle,
+                        style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Icon(Icons.open_in_new, color: color, size: 16),
+            ],
+          ),
+        ),
+      );
+
   Widget _sponsorCard({
     required String name,
     required String subtitle,
@@ -242,32 +328,27 @@ class ProfileScreen extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.sports_cricket,
-              color: isPrimary ? Colors.black87 : AppColors.secondary,
-              size: 28,
-            ),
+            Icon(Icons.sports_cricket,
+                color: isPrimary ? Colors.black87 : AppColors.secondary,
+                size: 28),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: TextStyle(
-                      color: isPrimary ? Colors.black87 : AppColors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color:
-                          isPrimary ? Colors.black54 : AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
+                  Text(name,
+                      style: TextStyle(
+                          color: isPrimary
+                              ? Colors.black87
+                              : AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color: isPrimary
+                              ? Colors.black54
+                              : AppColors.textSecondary,
+                          fontSize: 11)),
                 ],
               ),
             ),
@@ -286,8 +367,8 @@ class _InfoRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: const TextStyle(
-                color: AppColors.textMuted, fontSize: 13)),
+            style:
+                const TextStyle(color: AppColors.textMuted, fontSize: 13)),
         Text(value,
             style: const TextStyle(
                 color: AppColors.textPrimary,

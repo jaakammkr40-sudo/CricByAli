@@ -31,6 +31,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate app icon
+        run: flutter pub run flutter_launcher_icons
+        continue-on-error: true
+
       - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons
 
